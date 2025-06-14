@@ -57,13 +57,14 @@ jobs:
               make check
             '
 
+      - name: Install Trivy
+        run: |
+          wget -qO- https://github.com/aquasecurity/trivy/releases/latest/download/trivy_$(uname -s)_$(uname -m).tar.gz | tar zxvf -
+          sudo mv trivy /usr/local/bin/
+
       - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@v0.11.2
-        with:
-          image-ref: ${{ env.REPO }}:${{ env.TAG }}
-          format: table
-          exit-code: 1
-          ignore-unfixed: true
+        run: |
+          trivy image --scanners vuln --table-mode summary --exit-code 1 --ignore-unfixed ${{ env.REPO }}:${{ env.TAG }}
 
       - name: Generate SBOM
         run: |
