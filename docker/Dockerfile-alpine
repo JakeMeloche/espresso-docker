@@ -39,14 +39,6 @@ RUN apk add --no-cache --virtual .build-deps \
     py3-matplotlib \
     libc6-compat \
     libstdc++ && \
-    # Remove existing symlinks if they exist
-    rm -f /usr/lib/libgcc.a && \
-    rm -f /usr/lib/libssp.a && \
-    rm -f /usr/lib/libssp_nonshared.a && \
-    # Create symlinks for missing libraries
-    ln -s /usr/lib/gcc/x86_64-alpine-linux-musl/*/libgcc.a /usr/lib/libgcc.a && \
-    ln -s /usr/lib/gcc/x86_64-alpine-linux-musl/*/libssp.a /usr/lib/libssp.a && \
-    ln -s /usr/lib/gcc/x86_64-alpine-linux-musl/*/libssp_nonshared.a /usr/lib/libssp_nonshared.a && \
     # Create user and set up environment
     adduser -D espresso && \
     mkdir -p /home/espresso && \
@@ -71,9 +63,10 @@ RUN echo "using mpi ;" > /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/user-c
 
 # Create build script for B2 engine
 RUN echo '#!/bin/sh' > /home/espresso/build_b2.sh && \
-    echo 'cd /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/tools/build/src/engine' >> /home/espresso/build_b2.sh && \
-    echo 'rm -f check_cxx11.cpp yyacc.cpp' >> /home/espresso/build_b2.sh && \
-    echo 'g++ -o b2 -std=c++11 -D_GNU_SOURCE -fno-stack-protector -O2 -s -L/usr/lib/gcc/x86_64-alpine-linux-musl/13.2.1 -lssp_nonshared *.cpp' >> /home/espresso/build_b2.sh && \
+    echo 'cd /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/tools/build' >> /home/espresso/build_b2.sh && \
+    echo './bootstrap.sh --with-toolset=gcc' >> /home/espresso/build_b2.sh && \
+    echo 'cp b2 /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/' >> /home/espresso/build_b2.sh && \
+    echo 'chmod +x /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/b2' >> /home/espresso/build_b2.sh && \
     chmod +x /home/espresso/build_b2.sh
 
 # Build B2 engine
