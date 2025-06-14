@@ -103,7 +103,3 @@
     
     # User lands in the ESPResSo repo, ready to build
     CMD ["/bin/sh"]
-    
-    # Set Boost environment variables
-    ENV BOOST_ROOT=/home/espresso/boost_${BOOST_VERSION_UNDERSCORE}
-    ENV LD_LIBRARY_PATH=/home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/stage/lib:${LD_LIBRARY_PATH} 

@@ -53,14 +53,13 @@ jobs:
               cd espresso && \
               mkdir build && cd build && \
               cmake .. \
-                -DBOOST_ROOT=$BOOST_ROOT \
+                -DBOOST_ROOT=/home/espresso/boost_1_84_0 \
                 -DBoost_NO_SYSTEM_PATHS=ON \
-                -DBoost_LIBRARY_DIRS=$BOOST_ROOT/stage/lib \
-                -DBoost_INCLUDE_DIRS=$BOOST_ROOT \
+                -DBoost_LIBRARY_DIRS=/home/espresso/boost_1_84_0/stage/lib \
+                -DBoost_INCLUDE_DIRS=/home/espresso/boost_1_84_0 \
                 -DBoost_USE_STATIC_LIBS=OFF \
                 -DBoost_USE_MULTITHREADED=ON \
-                -DBoost_USE_STATIC_RUNTIME=OFF \
-                -DPython_EXECUTABLE=/usr/bin/python3 && \
+                -DBoost_USE_STATIC_RUNTIME=OFF
               make -j$(nproc) && \
               make check
             '
