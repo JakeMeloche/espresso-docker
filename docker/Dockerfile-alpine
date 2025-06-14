@@ -1,52 +1,109 @@
 # ---- Build stage ----
     FROM alpine:3.20 AS build
 
+    # Install build dependencies
     RUN apk add --no-cache \
-        build-base cmake fftw-dev openmpi-dev openmpi python3 python3-dev py3-pip \
-        py3-scipy py3-setuptools py3-wheel py3-virtualenv git lapack-dev hdf5-dev \
-        linux-headers gfortran wget bzip2 openssh-client
+        build-base \
+        cmake \
+        fftw-dev \
+        openmpi-dev \
+        openmpi \
+        python3 \
+        python3-dev \
+        py3-pip \
+        py3-scipy \
+        py3-setuptools \
+        py3-wheel \
+        py3-virtualenv \
+        git \
+        lapack-dev \
+        hdf5-dev \
+        linux-headers \
+        gfortran \
+        wget \
+        bzip2 \
+        openssh-client
     
-    WORKDIR /home/espresso
+    # Set up OpenMPI environment
+    ENV PATH="/usr/lib/openmpi/bin:${PATH}"
+    # ENV LD_LIBRARY_PATH="/usr/lib/openmpi/lib:${LD_LIBRARY_PATH:-}"
+    ENV OMPI_MCA_plm=isolated
     
-    # Build Boost
-    ENV BOOST_VERSION=1.84.0
-    ENV BOOST_VERSION_UNDERSCORE=1_84_0
-    RUN wget -O boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 https://sourceforge.net/projects/boost/files/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2/download && \
-        tar --bzip2 -xf boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 && \
-        rm boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2
-    RUN echo "using mpi ;" > /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/user-config.jam
-    WORKDIR /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}
-    RUN ./bootstrap.sh --with-libraries=mpi,serialization,filesystem,system,test && \
-        ./b2 -j$(nproc) link=shared runtime-link=shared --user-config=user-config.jam
-    
-    # Install Python dependencies system-wide
-    WORKDIR /home/espresso
-    RUN pip install --upgrade pip && pip install numpy scipy cython==3.0.8 matplotlib
-    
-    # ---- Final stage ----
-    FROM alpine:3.20
-    
-    # Only runtime dependencies!
-    RUN apk add --no-cache \
-        fftw fftw-dev openmpi python3 py3-numpy py3-scipy hdf5 lapack build-base \
-        cmake openmpi-dev python3-dev py3-pip py3-setuptools py3-wheel git lapack-dev \
-        hdf5-dev linux-headers gfortran wget bzip2 openssh-client 
-    
-    # Copy Boost from build stage
-    COPY --from=build /home/espresso/boost_1_84_0 /home/espresso/boost_1_84_0
-    
-    # Copy Python site-packages from build stage to system Python
-    COPY --from=build /usr/lib/python3.*/site-packages /usr/lib/python3.*/site-packages
-    
-    # Set up user and working directory
+    # Create user
     RUN adduser -D espresso
     USER espresso
     WORKDIR /home/espresso
     
-    # Set Boost environment variables
-    ENV BOOST_ROOT=/home/espresso/boost_1_84_0
-    ENV LD_LIBRARY_PATH=/home/espresso/boost_1_84_0/stage/lib:${LD_LIBRARY_PATH}
-    ENV PATH="/usr/lib/openmpi/bin:${PATH}"
-    ENV OMPI_MCA_plm=isolated
+    # Set Boost version variables
+    ENV BOOST_VERSION=1.84.0
+    ENV BOOST_VERSION_UNDERSCORE=1_84_0
     
+    # Download and extract Boost
+    RUN wget -O boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 https://sourceforge.net/projects/boost/files/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2/download && \
+        tar --bzip2 -xf boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 && \
+        rm boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2
+    
+    # Add user-config.jam for Boost to enable MPI
+    RUN echo "using mpi ;" > /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/user-config.jam
+    
+    # Build Boost with required libraries and user-config.jam
+    WORKDIR /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}
+    RUN ./bootstrap.sh --with-libraries=mpi,serialization,filesystem,system,test && \
+        ./b2 -j$(nproc) link=shared runtime-link=shared --user-config=user-config.jam
+    
+    # Set up Python venv and install Python dependencies
+    WORKDIR /home/espresso
+    RUN python3 -m venv /home/espresso/venv
+    ENV PATH="/home/espresso/venv/bin:${PATH}"
+    RUN pip install --upgrade pip && pip install numpy scipy cython==3.0.8 matplotlib
+    
+    # Remove ESPResSo build step; user will build manually
+    WORKDIR /home/espresso
+    # The user will clone the ESPResSo repository manually after entering the container
+    # RUN git clone --depth=1 https://github.com/espressomd/espresso.git
+    # COPY . /home/espresso/espresso
+    
+    # ---- Final stage ----
+    FROM alpine:3.20
+    
+    RUN apk add --no-cache \
+        fftw \
+        fftw-dev \
+        openmpi \
+        python3 \
+        py3-numpy \
+        py3-scipy \
+        hdf5 \
+        lapack \
+        build-base \
+        cmake \
+        openmpi-dev \
+        python3-dev \
+        py3-pip \
+        py3-setuptools \
+        py3-wheel \
+        git \
+        lapack-dev \
+        hdf5-dev \
+        linux-headers \
+        gfortran \
+        wget \
+        bzip2 \
+        openssh-client
+    
+    # Copy user, venv, and boost from build stage
+    COPY --from=build /home/espresso /home/espresso
+    COPY --from=build /etc/passwd /etc/passwd
+    COPY --from=build /etc/group /etc/group
+    COPY --from=build /home/espresso/boost_1_84_0 /home/espresso/boost_1_84_0
+    
+    USER espresso
+    WORKDIR /home/espresso/espresso
+    ENV PATH="/home/espresso/venv/bin:${PATH}"
+    
+    # User lands in the ESPResSo repo, ready to build
     CMD ["/bin/sh"]
+    
+    # Set Boost environment variables
+    ENV BOOST_ROOT=/home/espresso/boost_${BOOST_VERSION_UNDERSCORE}
+    ENV LD_LIBRARY_PATH=/home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/stage/lib:${LD_LIBRARY_PATH} 
