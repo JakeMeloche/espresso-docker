@@ -72,7 +72,8 @@ RUN echo "using mpi ;" > /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/user-c
 # Create build script for B2 engine
 RUN echo '#!/bin/sh' > /home/espresso/build_b2.sh && \
     echo 'cd /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/tools/build/src/engine' >> /home/espresso/build_b2.sh && \
-    echo 'g++ -o b2 -std=c++11 -D_GNU_SOURCE -fno-stack-protector -O2 -s *.cpp' >> /home/espresso/build_b2.sh && \
+    echo 'rm -f check_cxx11.cpp yyacc.cpp' >> /home/espresso/build_b2.sh && \
+    echo 'g++ -o b2 -std=c++11 -D_GNU_SOURCE -fno-stack-protector -O2 -s -Wl,--no-as-needed *.cpp' >> /home/espresso/build_b2.sh && \
     chmod +x /home/espresso/build_b2.sh
 
 # Build B2 engine
