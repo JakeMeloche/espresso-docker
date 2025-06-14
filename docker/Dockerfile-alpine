@@ -69,18 +69,14 @@ RUN wget -O boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 https://sourceforge.net/pr
 # Configure Boost
 RUN echo "using mpi ;" > /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/user-config.jam
 
-# Build B2 engine using Makefile
-RUN cd /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/tools/build/src/engine && \
-    echo 'CXX = g++' > Makefile && \
-    echo 'CXXFLAGS = -std=c++11 -D_GNU_SOURCE -fno-stack-protector -fno-stack-check -fno-stack-protector-all -O2 -s' >> Makefile && \
-    echo 'SRCS = $(wildcard *.cpp)' >> Makefile && \
-    echo 'OBJS = $(SRCS:.cpp=.o)' >> Makefile && \
-    echo 'TARGET = b2' >> Makefile && \
-    echo '$(TARGET): $(OBJS)' >> Makefile && \
-    echo '\t$(CXX) $(CXXFLAGS) -o $@ $^' >> Makefile && \
-    echo '.cpp.o:' >> Makefile && \
-    echo '\t$(CXX) $(CXXFLAGS) -c $<' >> Makefile && \
-    make
+# Create build script for B2 engine
+RUN echo '#!/bin/sh' > /home/espresso/build_b2.sh && \
+    echo 'cd /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/tools/build/src/engine' >> /home/espresso/build_b2.sh && \
+    echo 'g++ -o b2 -std=c++11 -D_GNU_SOURCE -fno-stack-protector -fno-stack-check -fno-stack-protector-all -O2 -s *.cpp' >> /home/espresso/build_b2.sh && \
+    chmod +x /home/espresso/build_b2.sh
+
+# Build B2 engine
+RUN /home/espresso/build_b2.sh
 
 # Build Boost
 RUN cd /home/espresso/boost_${BOOST_VERSION_UNDERSCORE} && \
@@ -100,7 +96,8 @@ RUN cd /home/espresso/boost_${BOOST_VERSION_UNDERSCORE} && \
 
 # Cleanup
 RUN cd /home/espresso && \
-    rm -rf /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/boost_${BOOST_VERSION_UNDERSCORE}
+    rm -rf /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/boost_${BOOST_VERSION_UNDERSCORE} && \
+    rm /home/espresso/build_b2.sh
 
 # Set up Python virtual environment and install packages
 RUN python3 -m venv /home/espresso/venv && \
