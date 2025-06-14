@@ -67,9 +67,60 @@ RUN wget -O boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 https://sourceforge.net/pr
     rm boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 && \
     echo "using mpi ;" > /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/user-config.jam && \
     cd /home/espresso/boost_${BOOST_VERSION_UNDERSCORE} && \
-    # Download pre-built B2 engine
-    wget https://github.com/boostorg/build/releases/download/boost-${BOOST_VERSION}/b2 && \
-    chmod +x b2 && \
+    # Build B2 engine with proper flags
+    cd tools/build/src/engine && \
+    g++ -o b2 \
+        -std=c++11 \
+        -D_GNU_SOURCE \
+        -pthread \
+        -O2 \
+        -s \
+        -Wl,--no-as-needed \
+        builtins.cpp \
+        class.cpp \
+        command.cpp \
+        compile.cpp \
+        constants.cpp \
+        cwd.cpp \
+        debug.cpp \
+        debugger.cpp \
+        execcmd.cpp \
+        execunix.cpp \
+        filesys.cpp \
+        fileunix.cpp \
+        frames.cpp \
+        function.cpp \
+        glob.cpp \
+        hash.cpp \
+        hcache.cpp \
+        hdrmacro.cpp \
+        headers.cpp \
+        jam_strings.cpp \
+        jam.cpp \
+        jamgram.cpp \
+        lists.cpp \
+        make.cpp \
+        make1.cpp \
+        md5.cpp \
+        mem.cpp \
+        modules.cpp \
+        native.cpp \
+        object.cpp \
+        option.cpp \
+        output.cpp \
+        parse.cpp \
+        pathunix.cpp \
+        pathsys.cpp \
+        regexp.cpp \
+        rules.cpp \
+        scan.cpp \
+        search.cpp \
+        startup.cpp \
+        subst.cpp \
+        sysinfo.cpp \
+        timestamp.cpp \
+        variable.cpp && \
+    cd ../../../.. && \
     # Build Boost with proper flags
     ./b2 -j$(nproc) \
         link=shared \
