@@ -1,233 +1,52 @@
 # ---- Build stage ----
-FROM alpine:3.20 AS build
+    FROM alpine:3.20 AS build
 
-# Set Boost version
-ENV BOOST_VERSION=1.84.0
-ENV BOOST_VERSION_UNDERSCORE=1_84_0
-
-# Install only essential build dependencies and clean up in one layer
-RUN apk add --no-cache --virtual .build-deps \
-    build-base \
-    cmake \
-    fftw-dev \
-    openmpi-dev \
-    openmpi \
-    python3 \
-    python3-dev \
-    py3-pip \
-    py3-setuptools \
-    py3-wheel \
-    py3-virtualenv \
-    git \
-    hdf5-dev \
-    linux-headers \
-    gfortran \
-    wget \
-    bzip2 \
-    # Additional dependencies for Python packages
-    freetype-dev \
-    libpng-dev \
-    gcc \
-    g++ \
-    make \
-    musl-dev \
-    lapack-dev \
-    openblas-dev \
-    # Additional Python dependencies
-    py3-numpy \
-    py3-scipy \
-    py3-matplotlib \
-    libc6-compat \
-    libstdc++ && \
-    # Create user and set up environment
-    adduser -D espresso && \
-    mkdir -p /home/espresso && \
-    chown -R espresso:espresso /home/espresso && \
-    # Clean up
-    rm -rf /var/cache/apk/* && \
-    rm -rf /usr/share/man/* && \
-    rm -rf /usr/share/doc/* && \
-    rm -rf /usr/share/info/* && \
-    find /usr -type d -name "__pycache__" -exec rm -rf {} + && \
-    find /usr -type f -name "*.pyc" -delete
-
-WORKDIR /home/espresso
-
-# Download and extract Boost
-RUN wget -O boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 https://sourceforge.net/projects/boost/files/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2/download && \
-    tar --bzip2 -xf boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 && \
-    rm boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2
-
-# Configure Boost
-RUN echo "using mpi ;" > /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/user-config.jam
-
-# Create build script for B2 engine
-RUN echo '#!/bin/sh' > /home/espresso/build_b2.sh && \
-    echo 'cd /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/tools/build' >> /home/espresso/build_b2.sh && \
-    echo './bootstrap.sh --with-toolset=gcc' >> /home/espresso/build_b2.sh && \
-    echo 'cp b2 /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/' >> /home/espresso/build_b2.sh && \
-    echo 'chmod +x /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/b2' >> /home/espresso/build_b2.sh && \
-    chmod +x /home/espresso/build_b2.sh
-
-# Build B2 engine
-RUN /home/espresso/build_b2.sh
-
-# Build Boost
-RUN cd /home/espresso/boost_${BOOST_VERSION_UNDERSCORE} && \
-    ./b2 -j$(nproc) \
-        link=shared \
-        runtime-link=shared \
-        --user-config=user-config.jam \
-        --with-mpi \
-        --with-serialization \
-        --with-filesystem \
-        --with-system \
-        --with-test \
-        toolset=gcc \
-        cxxflags="-std=c++11 -D_GNU_SOURCE -pthread" \
-        linkflags="-Wl,--no-as-needed -pthread" \
-        threading=multi
-
-# Cleanup
-RUN cd /home/espresso && \
-    rm -rf /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/boost_${BOOST_VERSION_UNDERSCORE} && \
-    rm /home/espresso/build_b2.sh
-
-# Set up Python virtual environment and install packages
-RUN python3 -m venv /home/espresso/venv && \
-    # Upgrade pip and install build dependencies first
-    /home/espresso/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    # Install build dependencies
-    /home/espresso/venv/bin/pip install --no-cache-dir --upgrade build && \
-    # Install Cython first
-    /home/espresso/venv/bin/pip install --no-cache-dir -v cython==3.0.8 && \
-    # Verify Cython installation
-    /home/espresso/venv/bin/python3 -c "import cython; print('Cython installed at:', cython.__file__)" && \
-    # Install numpy
-    /home/espresso/venv/bin/pip install --no-cache-dir -v numpy==1.26.4 && \
-    # Verify numpy installation
-    /home/espresso/venv/bin/python3 -c "import numpy; print('NumPy installed at:', numpy.__file__)" && \
-    # Install scipy
-    /home/espresso/venv/bin/pip install --no-cache-dir -v scipy==1.12.0 && \
-    # Verify scipy installation
-    /home/espresso/venv/bin/python3 -c "import scipy; print('SciPy installed at:', scipy.__file__)" && \
-    # Install matplotlib
-    /home/espresso/venv/bin/pip install --no-cache-dir -v matplotlib==3.8.3 && \
-    # Verify matplotlib installation
-    /home/espresso/venv/bin/python3 -c "import matplotlib; print('Matplotlib installed at:', matplotlib.__file__)" && \
-    # List the contents of the site-packages directory
-    ls -la /home/espresso/venv/lib/python3.12/site-packages/ && \
-    # Clean up Python cache
-    find /home/espresso -type d -name "__pycache__" -exec rm -rf {} + && \
-    find /home/espresso -type f -name "*.pyc" -delete
-
-USER espresso
-WORKDIR /home/espresso
-
-# Set up OpenMPI and Boost environment
-ENV PATH="/usr/lib/openmpi/bin:${PATH}" \
-    OMPI_MCA_plm=isolated \
-    BOOST_VERSION=1.84.0 \
-    BOOST_VERSION_UNDERSCORE=1_84_0
-
-# ---- Final stage ----
-FROM alpine:3.20
-
-# Set Boost version
-ENV BOOST_VERSION=1.84.0
-ENV BOOST_VERSION_UNDERSCORE=1_84_0
-
-# Install all required build, runtime, and test dependencies in one step
-RUN apk add --no-cache \
-    build-base \
-    gcc \
-    g++ \
-    musl-dev \
-    libgcc \
-    libssp \
-    cmake \
-    git \
-    fftw \
-    fftw-dev \
-    openmpi \
-    openmpi-dev \
-    python3 \
-    py3-pip \
-    python3-dev \
-    py3-numpy \
-    py3-setuptools \
-    py3-wheel \
-    hdf5 \
-    hdf5-dev && \
-    # Aggressive cleanup
-    rm -rf /var/cache/apk/* && \
-    rm -rf /usr/share/man/* && \
-    rm -rf /usr/share/doc/* && \
-    rm -rf /usr/share/info/* && \
-    rm -rf /usr/share/locale/* && \
-    rm -rf /usr/share/zoneinfo/* && \
-    # Clean Python cache
-    find /usr -type d -name "__pycache__" -exec rm -rf {} + && \
-    find /usr -type f -name "*.pyc" -delete && \
-    # Strip all binaries and libraries
-    find /usr -type f -name "*.so*" -exec strip {} \; 2>/dev/null || true && \
-    find /usr -type f -executable -exec strip {} \; 2>/dev/null || true && \
-    # Remove unnecessary files
-    find /usr -type f -name "*.a" -delete && \
-    find /usr -type f -name "*.la" -delete && \
-    find /usr -type f -name "*.spec" -delete && \
-    # find /usr -type f -name "*.py" ! -name "sitecustomize.py" -delete && \
-    find /usr -type f -name "*.pyc" -delete && \
-    find /usr -type f -name "*.pyo" -delete && \
-    find /usr -type f -name "*.pyd" -delete && \
-    find /usr -type f -name "*.h" ! -path "*/include/*" -delete && \
-    find /usr -type f -name "*.hpp" ! -path "*/include/*" -delete
-
-# Ensure git is present for test step
-RUN apk add --no-cache git
-
-# Ensure cmake is present for test step
-RUN apk add --no-cache cmake
-
-# Ensure build-base (make, gcc, g++) is present for test step
-RUN apk add --no-cache build-base
-
-# Set environment variables
-ENV FFTW3_INCLUDE_DIR=/usr/include \
-    FFTW3_LIBRARIES=/usr/lib/libfftw3.so \
-    FFTW3F_LIBRARIES=/usr/lib/libfftw3f.so \
-    PATH="/usr/lib/openmpi/bin:${PATH}" \
-    OMPI_MCA_plm=isolated
-
-# Create minimal directory structure and copy Python virtual environment
-RUN mkdir -p /home/espresso/venv/bin && \
-    mkdir -p /home/espresso/venv/lib/python3.11/site-packages
-
-# Copy only essential files from build stage
-COPY --from=build /home/espresso/venv/bin/python3 /home/espresso/venv/bin/
-COPY --from=build /home/espresso/venv/bin/pip /home/espresso/venv/bin/
-COPY --from=build /home/espresso/venv/lib/python3.12/site-packages/numpy /home/espresso/venv/lib/python3.12/site-packages/
-COPY --from=build /home/espresso/venv/lib/python3.12/site-packages/scipy /home/espresso/venv/lib/python3.12/site-packages/
-COPY --from=build /home/espresso/venv/lib/python3.12/site-packages/cython.py /home/espresso/venv/lib/python3.12/site-packages/
-COPY --from=build /home/espresso/venv/lib/python3.12/site-packages/Cython /home/espresso/venv/lib/python3.12/site-packages/
-COPY --from=build /home/espresso/venv/lib/python3.12/site-packages/Cython-3.0.8.dist-info /home/espresso/venv/lib/python3.12/site-packages/
-COPY --from=build /home/espresso/venv/lib/python3.12/site-packages/matplotlib /home/espresso/venv/lib/python3.12/site-packages/
-COPY --from=build /home/espresso/venv/lib/python3.12/site-packages/*.dist-info /home/espresso/venv/lib/python3.12/site-packages/
-COPY --from=build /home/espresso/venv/lib/python3.12/site-packages/*.egg-info /home/espresso/venv/lib/python3.12/site-packages/
-COPY --from=build /etc/passwd /etc/passwd
-COPY --from=build /etc/group /etc/group
-COPY --from=build /home/espresso/boost_${BOOST_VERSION_UNDERSCORE} /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}
-
-# Final cleanup
-RUN find /home/espresso -type d -name "__pycache__" -exec rm -rf {} + && \
-    find /home/espresso -type f -name "*.pyc" -delete && \
-    find /home/espresso -type f -name "*.pyo" -delete && \
-    find /home/espresso -type f -name "*.pyd" -delete && \
-    find /home/espresso -type f -name "*.so" -exec strip {} \; 2>/dev/null || true
-
-USER espresso
-WORKDIR /home/espresso/espresso
-
-RUN pip install --no-cache-dir numpy scipy cython==3.0.8 matplotlib
-
-CMD ["/bin/sh"]
+    RUN apk add --no-cache \
+        build-base cmake fftw-dev openmpi-dev openmpi python3 python3-dev py3-pip \
+        py3-scipy py3-setuptools py3-wheel py3-virtualenv git lapack-dev hdf5-dev \
+        linux-headers gfortran wget bzip2 openssh-client
+    
+    WORKDIR /home/espresso
+    
+    # Build Boost
+    ENV BOOST_VERSION=1.84.0
+    ENV BOOST_VERSION_UNDERSCORE=1_84_0
+    RUN wget -O boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 https://sourceforge.net/projects/boost/files/boost/${BOOST_VERSION}/boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2/download && \
+        tar --bzip2 -xf boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 && \
+        rm boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2
+    RUN echo "using mpi ;" > /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/user-config.jam
+    WORKDIR /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}
+    RUN ./bootstrap.sh --with-libraries=mpi,serialization,filesystem,system,test && \
+        ./b2 -j$(nproc) link=shared runtime-link=shared --user-config=user-config.jam
+    
+    # Install Python dependencies system-wide
+    WORKDIR /home/espresso
+    RUN pip install --upgrade pip && pip install numpy scipy cython==3.0.8 matplotlib
+    
+    # ---- Final stage ----
+    FROM alpine:3.20
+    
+    # Only runtime dependencies!
+    RUN apk add --no-cache \
+        fftw fftw-dev openmpi python3 py3-numpy py3-scipy hdf5 lapack build-base \
+        cmake openmpi-dev python3-dev py3-pip py3-setuptools py3-wheel git lapack-dev \
+        hdf5-dev linux-headers gfortran wget bzip2 openssh-client 
+    
+    # Copy Boost from build stage
+    COPY --from=build /home/espresso/boost_1_84_0 /home/espresso/boost_1_84_0
+    
+    # Copy Python site-packages from build stage to system Python
+    COPY --from=build /usr/lib/python3.*/site-packages /usr/lib/python3.*/site-packages
+    
+    # Set up user and working directory
+    RUN adduser -D espresso
+    USER espresso
+    WORKDIR /home/espresso
+    
+    # Set Boost environment variables
+    ENV BOOST_ROOT=/home/espresso/boost_1_84_0
+    ENV LD_LIBRARY_PATH=/home/espresso/boost_1_84_0/stage/lib:${LD_LIBRARY_PATH}
+    ENV PATH="/usr/lib/openmpi/bin:${PATH}"
+    ENV OMPI_MCA_plm=isolated
+    
+    CMD ["/bin/sh"]
