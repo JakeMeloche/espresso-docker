@@ -191,6 +191,9 @@ RUN apk add --no-cache git
 # Ensure cmake is present for test step
 RUN apk add --no-cache cmake
 
+# Ensure build-base (make, gcc, g++) is present for test step
+RUN apk add --no-cache build-base
+
 # Set environment variables
 ENV FFTW3_INCLUDE_DIR=/usr/include \
     FFTW3_LIBRARIES=/usr/lib/libfftw3.so \
