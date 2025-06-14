@@ -227,7 +227,6 @@ RUN find /home/espresso -type d -name "__pycache__" -exec rm -rf {} + && \
 
 USER espresso
 WORKDIR /home/espresso/espresso
-ENV PATH="/home/espresso/venv/bin:${PATH}"
 
 RUN pip install --no-cache-dir numpy scipy cython==3.0.8 matplotlib
 
