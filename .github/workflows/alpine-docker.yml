@@ -53,7 +53,8 @@ jobs:
                 -DBoost_INCLUDE_DIRS=$BOOST_ROOT \
                 -DBoost_USE_STATIC_LIBS=OFF \
                 -DBoost_USE_MULTITHREADED=ON \
-                -DBoost_USE_STATIC_RUNTIME=OFF && \
+                -DBoost_USE_STATIC_RUNTIME=OFF \
+                -DPython_EXECUTABLE=/usr/bin/python3 && \
               make -j$(nproc) && \
               make check
             '
