@@ -89,4 +89,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sbom
-          path: sbom.spdx 
+          path: sbom.spdx
+
+      - name: Debug ldd on all Python extensions
+        run: |
+          docker run --rm ${{ env.REPO }}:${{ env.TAG }} sh -c \
+            'find /home/espresso/venv -name "*.so" | xargs ldd | grep "not found" || echo "All good"' 
