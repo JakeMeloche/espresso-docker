@@ -185,6 +185,9 @@ RUN apk add --no-cache --virtual .build-deps \
     find /usr -type f -name "*.h" ! -path "*/include/*" -delete && \
     find /usr -type f -name "*.hpp" ! -path "*/include/*" -delete
 
+# Ensure git is present for test step
+RUN apk add --no-cache git
+
 # Set environment variables
 ENV FFTW3_INCLUDE_DIR=/usr/include \
     FFTW3_LIBRARIES=/usr/lib/libfftw3.so \
