@@ -141,6 +141,11 @@ ENV BOOST_VERSION_UNDERSCORE=1_84_0
 RUN apk add --no-cache --virtual .build-deps \
     # Core build requirements
     build-base \
+    gcc \
+    g++ \
+    musl-dev \
+    libgcc \
+    libssp \
     cmake \
     git \
     # Required libraries and their dev packages
