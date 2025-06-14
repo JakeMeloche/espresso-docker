@@ -38,7 +38,7 @@ jobs:
           load: true
           tags: ${{ env.REPO }}:${{ env.TAG }}
 
-      - name: Debug: Check Python and NumPy in image
+      - name: Debug Check Python and NumPy in image
         run: |
           docker run --rm -e BOOST_ROOT=/home/espresso/boost_1_84_0 -e LD_LIBRARY_PATH=/home/espresso/boost_1_84_0/stage/lib -w /home/espresso \
             ${{ env.REPO }}:${{ env.TAG }} \
