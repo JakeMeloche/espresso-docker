@@ -67,61 +67,13 @@ RUN wget -O boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 https://sourceforge.net/pr
     rm boost_${BOOST_VERSION_UNDERSCORE}.tar.bz2 && \
     echo "using mpi ;" > /home/espresso/boost_${BOOST_VERSION_UNDERSCORE}/user-config.jam && \
     cd /home/espresso/boost_${BOOST_VERSION_UNDERSCORE} && \
-    # Build B2 engine with minimal flags
-    cd tools/build/src/engine && \
-    g++ -o b2 \
-        -std=c++11 \
-        -D_GNU_SOURCE \
-        -fno-stack-protector \
-        -fno-stack-check \
-        -fno-stack-protector-all \
-        -O2 \
-        -s \
-        builtins.cpp \
-        class.cpp \
-        command.cpp \
-        compile.cpp \
-        constants.cpp \
-        cwd.cpp \
-        debug.cpp \
-        debugger.cpp \
-        execcmd.cpp \
-        execunix.cpp \
-        filesys.cpp \
-        fileunix.cpp \
-        frames.cpp \
-        function.cpp \
-        glob.cpp \
-        hash.cpp \
-        hcache.cpp \
-        hdrmacro.cpp \
-        headers.cpp \
-        jam_strings.cpp \
-        jam.cpp \
-        jamgram.cpp \
-        lists.cpp \
-        make.cpp \
-        make1.cpp \
-        md5.cpp \
-        mem.cpp \
-        modules.cpp \
-        native.cpp \
-        object.cpp \
-        option.cpp \
-        output.cpp \
-        parse.cpp \
-        pathunix.cpp \
-        pathsys.cpp \
-        regexp.cpp \
-        rules.cpp \
-        scan.cpp \
-        search.cpp \
-        startup.cpp \
-        subst.cpp \
-        sysinfo.cpp \
-        timestamp.cpp \
-        variable.cpp && \
-    cd ../../../.. && \
+    # Create build script for B2 engine
+    echo '#!/bin/sh' > build_b2.sh && \
+    echo 'cd tools/build/src/engine' >> build_b2.sh && \
+    echo 'g++ -o b2 -std=c++11 -D_GNU_SOURCE -fno-stack-protector -fno-stack-check -fno-stack-protector-all -O2 -s *.cpp' >> build_b2.sh && \
+    echo 'cd ../../../..' >> build_b2.sh && \
+    chmod +x build_b2.sh && \
+    ./build_b2.sh && \
     # Build Boost with proper flags
     ./b2 -j$(nproc) \
         link=shared \
