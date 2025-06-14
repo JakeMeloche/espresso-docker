@@ -1,0 +1,84 @@
+name: Build, Test, Scan, and Push Alpine Docker Image
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test-scan-push:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: espresso-alpine
+      DOCKERFILE: docker/Dockerfile-alpine
+      REGISTRY: docker.io
+      REPO: ${{ secrets.DOCKERHUB_USERNAME }}/espresso-alpine
+      TAG: ${{ github.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (for multi-arch, optional)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE }}
+          push: false
+          tags: ${{ env.REPO }}:${{ env.TAG }}
+
+      - name: Test image (clone, cmake, make, make check)
+        run: |
+          docker run --rm -e BOOST_ROOT=/home/espresso/boost_1_84_0 -e LD_LIBRARY_PATH=/home/espresso/boost_1_84_0/stage/lib -w /home/espresso \
+            ${{ env.REPO }}:${{ env.TAG }} \
+            sh -c '
+              git clone https://github.com/espressomd/espresso.git && \
+              cd espresso && \
+              mkdir build && cd build && \
+              cmake .. \
+                -DBOOST_ROOT=$BOOST_ROOT \
+                -DBoost_NO_SYSTEM_PATHS=ON \
+                -DBoost_LIBRARY_DIRS=$BOOST_ROOT/stage/lib \
+                -DBoost_INCLUDE_DIRS=$BOOST_ROOT \
+                -DBoost_USE_STATIC_LIBS=OFF \
+                -DBoost_USE_MULTITHREADED=ON \
+                -DBoost_USE_STATIC_RUNTIME=OFF && \
+              make -j$(nproc) && \
+              make check
+            '
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@v0.16.2
+        with:
+          image-ref: ${{ env.REPO }}:${{ env.TAG }}
+          format: table
+          exit-code: 1
+          ignore-unfixed: true
+
+      - name: Generate SBOM
+        run: |
+          docker sbom ${{ env.REPO }}:${{ env.TAG }} > sbom.spdx || true
+
+      - name: Push image to Docker Hub
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE }}
+          push: true
+          tags: ${{ env.REPO }}:${{ env.TAG }}
+
+      - name: Upload SBOM as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx 
